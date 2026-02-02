@@ -4,8 +4,128 @@ export interface SelectionInfo {
   headers: string[];
 }
 
+export interface SheetInfo {
+  name: string;
+}
+
+export interface AvailableSheetsResult {
+  sheets: SheetInfo[];
+  currentSheet: string;
+}
+
 export interface Record {
   [key: string]: unknown;
+}
+
+/**
+ * Get list of all available sheets in the workbook
+ */
+export async function getAvailableSheets(): Promise<AvailableSheetsResult> {
+  return Excel.run(async (context) => {
+    const worksheets = context.workbook.worksheets;
+    const activeSheet = context.workbook.worksheets.getActiveWorksheet();
+    worksheets.load("items/name");
+    activeSheet.load("name");
+    await context.sync();
+
+    return {
+      sheets: worksheets.items.map((sheet) => ({ name: sheet.name })),
+      currentSheet: activeSheet.name,
+    };
+  });
+}
+
+/**
+ * Get information about a specific sheet
+ */
+export async function getSheetInfo(sheetName: string): Promise<SelectionInfo> {
+  return Excel.run(async (context) => {
+    const sheet = context.workbook.worksheets.getItem(sheetName);
+    const usedRange = sheet.getUsedRange();
+    usedRange.load(["address", "rowCount", "values"]);
+    await context.sync();
+
+    const values = usedRange.values;
+    if (!values || values.length < 2) {
+      return {
+        range: usedRange.address,
+        rowCount: 0,
+        headers: [],
+      };
+    }
+
+    // First row is headers
+    const headers = (values[0] as unknown[])
+      .map((h, idx) => {
+        const val = String(h ?? "").trim();
+        return val || `Column ${String.fromCharCode(65 + idx)}`;
+      })
+      .filter((_, idx) => {
+        // Only include columns that have at least some data
+        return values.some(
+          (row, rowIdx) => rowIdx > 0 && row[idx] !== null && row[idx] !== ""
+        );
+      });
+
+    return {
+      range: usedRange.address,
+      rowCount: values.length - 1, // Exclude header row
+      headers,
+    };
+  });
+}
+
+/**
+ * Convert an entire sheet to array of records
+ */
+export async function sheetToRecords(sheetName: string): Promise<Record[]> {
+  return Excel.run(async (context) => {
+    const sheet = context.workbook.worksheets.getItem(sheetName);
+    const usedRange = sheet.getUsedRange();
+    usedRange.load("values");
+    await context.sync();
+
+    const values = usedRange.values;
+    if (!values || values.length < 2) {
+      return [];
+    }
+
+    // First row is headers
+    const rawHeaders = values[0] as unknown[];
+    const headers = rawHeaders.map((h, idx) => {
+      const val = String(h ?? "").trim();
+      return val || `Column ${String.fromCharCode(65 + idx)}`;
+    });
+
+    // Find columns with data
+    const validColumns = headers
+      .map((_, idx) => idx)
+      .filter((idx) =>
+        values.some(
+          (row, rowIdx) => rowIdx > 0 && row[idx] !== null && row[idx] !== ""
+        )
+      );
+
+    // Convert to records
+    const records: Record[] = [];
+    for (let i = 1; i < values.length; i++) {
+      const row = values[i];
+
+      // Skip empty rows
+      const hasData = validColumns.some(
+        (idx) => row[idx] !== null && row[idx] !== ""
+      );
+      if (!hasData) continue;
+
+      const record: Record = {};
+      for (const idx of validColumns) {
+        record[headers[idx]] = row[idx];
+      }
+      records.push(record);
+    }
+
+    return records;
+  });
 }
 
 /**

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   makeStyles,
   tokens,
@@ -8,8 +8,9 @@ import {
   Checkbox,
   Label,
 } from "@fluentui/react-components";
-import { SelectionInfo } from "../../../excel/dataHandler";
+import { SheetInfo, getSheetInfo } from "../../../excel/dataHandler";
 import { runRankOperation } from "../../../api/operations";
+import { SheetSelector } from "../SheetSelector";
 
 const useStyles = makeStyles({
   container: {
@@ -30,22 +31,44 @@ const useStyles = makeStyles({
 });
 
 interface RankConfigProps {
-  selection: SelectionInfo;
+  sheets: SheetInfo[];
+  currentSheet: string;
   apiKey: string;
+  onRefreshSheets: () => void;
   onRunning: () => void;
   onComplete: (success: boolean, message: string, sessionUrl?: string) => void;
 }
 
 export function RankConfig({
-  selection,
+  sheets,
+  currentSheet,
   apiKey,
+  onRefreshSheets,
   onRunning,
   onComplete,
 }: RankConfigProps) {
   const styles = useStyles();
+  const [selectedSheet, setSelectedSheet] = useState(currentSheet);
+  const [rowCount, setRowCount] = useState<number | undefined>(undefined);
   const [task, setTask] = useState("");
   const [fieldName, setFieldName] = useState("score");
   const [ascending, setAscending] = useState(false);
+
+  useEffect(() => {
+    setSelectedSheet(currentSheet);
+  }, [currentSheet]);
+
+  useEffect(() => {
+    const loadSheetInfo = async () => {
+      try {
+        const info = await getSheetInfo(selectedSheet);
+        setRowCount(info.rowCount);
+      } catch {
+        setRowCount(undefined);
+      }
+    };
+    loadSheetInfo();
+  }, [selectedSheet]);
 
   const handleRun = async () => {
     if (!task.trim()) {
@@ -58,7 +81,7 @@ export function RankConfig({
     try {
       const result = await runRankOperation({
         apiKey,
-        selection,
+        sheetName: selectedSheet,
         task: task.trim(),
         fieldName,
         ascending,
@@ -74,6 +97,15 @@ export function RankConfig({
 
   return (
     <div className={styles.container}>
+      <SheetSelector
+        label="Input Sheet"
+        sheets={sheets}
+        selectedSheet={selectedSheet}
+        onSheetChange={setSelectedSheet}
+        onRefresh={onRefreshSheets}
+        rowCount={rowCount}
+      />
+
       <div className={styles.field}>
         <Label htmlFor="task">Task Description</Label>
         <Textarea

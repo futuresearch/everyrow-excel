@@ -1,10 +1,11 @@
-* {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
 html,
-body,
-#root {
+body {
   height: 100%;
   margin: 0;
   padding: 0;
@@ -14,9 +15,22 @@ body {
   font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto,
     "Helvetica Neue", sans-serif;
   background-color: #fafafa;
+  overflow-x: hidden;
 }
 
 #root {
+  height: 100%;
+  width: 100%;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+}
+
+/* Ensure FluentProvider wrapper takes full height */
+#root > div {
+  height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }

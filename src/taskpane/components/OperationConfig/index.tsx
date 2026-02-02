@@ -1,5 +1,5 @@
 import { Operation } from "../OperationPicker";
-import { SelectionInfo } from "../../../excel/dataHandler";
+import { SheetInfo } from "../../../excel/dataHandler";
 import { RankConfig } from "./RankConfig";
 import { ScreenConfig } from "./ScreenConfig";
 import { DedupeConfig } from "./DedupeConfig";
@@ -8,20 +8,24 @@ import { MergeConfig } from "./MergeConfig";
 
 interface OperationConfigProps {
   operation: Operation;
-  selection: SelectionInfo;
+  sheets: SheetInfo[];
+  currentSheet: string;
   apiKey: string;
+  onRefreshSheets: () => void;
   onRunning: () => void;
   onComplete: (success: boolean, message: string, sessionUrl?: string) => void;
 }
 
 export function OperationConfig({
   operation,
-  selection,
+  sheets,
+  currentSheet,
   apiKey,
+  onRefreshSheets,
   onRunning,
   onComplete,
 }: OperationConfigProps) {
-  const props = { selection, apiKey, onRunning, onComplete };
+  const props = { sheets, currentSheet, apiKey, onRefreshSheets, onRunning, onComplete };
 
   switch (operation) {
     case "rank":

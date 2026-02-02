@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   makeStyles,
   tokens,
@@ -6,11 +6,10 @@ import {
   Input,
   Button,
   Label,
-  Body1,
-  Caption1,
 } from "@fluentui/react-components";
-import { SelectionInfo } from "../../../excel/dataHandler";
+import { SheetInfo, getSheetInfo } from "../../../excel/dataHandler";
 import { runMergeOperation } from "../../../api/operations";
+import { SheetSelector } from "../SheetSelector";
 
 const useStyles = makeStyles({
   container: {
@@ -23,39 +22,92 @@ const useStyles = makeStyles({
     flexDirection: "column",
     gap: tokens.spacingVerticalXS,
   },
-  infoBox: {
-    backgroundColor: tokens.colorNeutralBackground3,
-    padding: tokens.spacingHorizontalS,
-    borderRadius: tokens.borderRadiusSmall,
+  sheetRow: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: tokens.spacingHorizontalM,
+    "& > *": {
+      flex: "1 1 120px",
+      minWidth: "120px",
+    },
   },
 });
 
 interface MergeConfigProps {
-  selection: SelectionInfo;
+  sheets: SheetInfo[];
+  currentSheet: string;
   apiKey: string;
+  onRefreshSheets: () => void;
   onRunning: () => void;
   onComplete: (success: boolean, message: string, sessionUrl?: string) => void;
 }
 
 export function MergeConfig({
-  selection,
+  sheets,
+  currentSheet,
   apiKey,
+  onRefreshSheets,
   onRunning,
   onComplete,
 }: MergeConfigProps) {
   const styles = useStyles();
+  const [leftSheet, setLeftSheet] = useState(currentSheet);
+  const [rightSheet, setRightSheet] = useState(
+    sheets.length > 1 && sheets[1].name !== currentSheet
+      ? sheets[1].name
+      : sheets.length > 0
+      ? sheets[0].name
+      : ""
+  );
+  const [leftRowCount, setLeftRowCount] = useState<number | undefined>(undefined);
+  const [rightRowCount, setRightRowCount] = useState<number | undefined>(undefined);
   const [task, setTask] = useState("");
-  const [table2Range, setTable2Range] = useState("");
   const [mergeOnLeft, setMergeOnLeft] = useState("");
   const [mergeOnRight, setMergeOnRight] = useState("");
+
+  useEffect(() => {
+    setLeftSheet(currentSheet);
+  }, [currentSheet]);
+
+  useEffect(() => {
+    const loadLeftInfo = async () => {
+      try {
+        const info = await getSheetInfo(leftSheet);
+        setLeftRowCount(info.rowCount);
+      } catch {
+        setLeftRowCount(undefined);
+      }
+    };
+    loadLeftInfo();
+  }, [leftSheet]);
+
+  useEffect(() => {
+    const loadRightInfo = async () => {
+      if (!rightSheet) {
+        setRightRowCount(undefined);
+        return;
+      }
+      try {
+        const info = await getSheetInfo(rightSheet);
+        setRightRowCount(info.rowCount);
+      } catch {
+        setRightRowCount(undefined);
+      }
+    };
+    loadRightInfo();
+  }, [rightSheet]);
 
   const handleRun = async () => {
     if (!task.trim()) {
       onComplete(false, "Please describe how to match rows");
       return;
     }
-    if (!table2Range.trim()) {
-      onComplete(false, "Please specify the second table range");
+    if (!leftSheet) {
+      onComplete(false, "Please select the left table sheet");
+      return;
+    }
+    if (!rightSheet) {
+      onComplete(false, "Please select the right table sheet");
       return;
     }
 
@@ -64,9 +116,9 @@ export function MergeConfig({
     try {
       const result = await runMergeOperation({
         apiKey,
-        selection,
+        leftSheetName: leftSheet,
+        rightSheetName: rightSheet,
         task: task.trim(),
-        table2Range: table2Range.trim(),
         mergeOnLeft: mergeOnLeft.trim() || undefined,
         mergeOnRight: mergeOnRight.trim() || undefined,
       });
@@ -85,18 +137,21 @@ export function MergeConfig({
 
   return (
     <div className={styles.container}>
-      <div className={styles.infoBox}>
-        <Body1>Table 1: {selection.range}</Body1>
-        <Caption1>({selection.rowCount} rows)</Caption1>
-      </div>
-
-      <div className={styles.field}>
-        <Label htmlFor="table2">Table 2 Range</Label>
-        <Input
-          id="table2"
-          placeholder="e.g., Sheet2!A1:D100"
-          value={table2Range}
-          onChange={(_, data) => setTable2Range(data.value)}
+      <div className={styles.sheetRow}>
+        <SheetSelector
+          label="Left Table"
+          sheets={sheets}
+          selectedSheet={leftSheet}
+          onSheetChange={setLeftSheet}
+          onRefresh={onRefreshSheets}
+          rowCount={leftRowCount}
+        />
+        <SheetSelector
+          label="Right Table"
+          sheets={sheets}
+          selectedSheet={rightSheet}
+          onSheetChange={setRightSheet}
+          rowCount={rightRowCount}
         />
       </div>
 
@@ -112,7 +167,7 @@ export function MergeConfig({
       </div>
 
       <div className={styles.field}>
-        <Label htmlFor="mergeLeft">Match Column (Table 1) - Optional</Label>
+        <Label htmlFor="mergeLeft">Match Column (Left Table) - Optional</Label>
         <Input
           id="mergeLeft"
           placeholder="e.g., company_name"
@@ -122,7 +177,7 @@ export function MergeConfig({
       </div>
 
       <div className={styles.field}>
-        <Label htmlFor="mergeRight">Match Column (Table 2) - Optional</Label>
+        <Label htmlFor="mergeRight">Match Column (Right Table) - Optional</Label>
         <Input
           id="mergeRight"
           placeholder="e.g., supplier_name"

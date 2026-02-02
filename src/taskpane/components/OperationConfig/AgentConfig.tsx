@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   makeStyles,
   tokens,
@@ -6,8 +6,9 @@ import {
   Button,
   Label,
 } from "@fluentui/react-components";
-import { SelectionInfo } from "../../../excel/dataHandler";
+import { SheetInfo, getSheetInfo } from "../../../excel/dataHandler";
 import { runAgentOperation } from "../../../api/operations";
+import { SheetSelector } from "../SheetSelector";
 
 const useStyles = makeStyles({
   container: {
@@ -23,20 +24,42 @@ const useStyles = makeStyles({
 });
 
 interface AgentConfigProps {
-  selection: SelectionInfo;
+  sheets: SheetInfo[];
+  currentSheet: string;
   apiKey: string;
+  onRefreshSheets: () => void;
   onRunning: () => void;
   onComplete: (success: boolean, message: string, sessionUrl?: string) => void;
 }
 
 export function AgentConfig({
-  selection,
+  sheets,
+  currentSheet,
   apiKey,
+  onRefreshSheets,
   onRunning,
   onComplete,
 }: AgentConfigProps) {
   const styles = useStyles();
+  const [selectedSheet, setSelectedSheet] = useState(currentSheet);
+  const [rowCount, setRowCount] = useState<number | undefined>(undefined);
   const [task, setTask] = useState("");
+
+  useEffect(() => {
+    setSelectedSheet(currentSheet);
+  }, [currentSheet]);
+
+  useEffect(() => {
+    const loadSheetInfo = async () => {
+      try {
+        const info = await getSheetInfo(selectedSheet);
+        setRowCount(info.rowCount);
+      } catch {
+        setRowCount(undefined);
+      }
+    };
+    loadSheetInfo();
+  }, [selectedSheet]);
 
   const handleRun = async () => {
     if (!task.trim()) {
@@ -49,7 +72,7 @@ export function AgentConfig({
     try {
       const result = await runAgentOperation({
         apiKey,
-        selection,
+        sheetName: selectedSheet,
         task: task.trim(),
       });
       onComplete(
@@ -67,6 +90,15 @@ export function AgentConfig({
 
   return (
     <div className={styles.container}>
+      <SheetSelector
+        label="Input Sheet"
+        sheets={sheets}
+        selectedSheet={selectedSheet}
+        onSheetChange={setSelectedSheet}
+        onRefresh={onRefreshSheets}
+        rowCount={rowCount}
+      />
+
       <div className={styles.field}>
         <Label htmlFor="task">Research Task</Label>
         <Textarea

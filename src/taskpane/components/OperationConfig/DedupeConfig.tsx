@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   makeStyles,
   tokens,
@@ -6,8 +6,9 @@ import {
   Button,
   Label,
 } from "@fluentui/react-components";
-import { SelectionInfo } from "../../../excel/dataHandler";
+import { SheetInfo, getSheetInfo } from "../../../excel/dataHandler";
 import { runDedupeOperation } from "../../../api/operations";
+import { SheetSelector } from "../SheetSelector";
 
 const useStyles = makeStyles({
   container: {
@@ -23,20 +24,42 @@ const useStyles = makeStyles({
 });
 
 interface DedupeConfigProps {
-  selection: SelectionInfo;
+  sheets: SheetInfo[];
+  currentSheet: string;
   apiKey: string;
+  onRefreshSheets: () => void;
   onRunning: () => void;
   onComplete: (success: boolean, message: string, sessionUrl?: string) => void;
 }
 
 export function DedupeConfig({
-  selection,
+  sheets,
+  currentSheet,
   apiKey,
+  onRefreshSheets,
   onRunning,
   onComplete,
 }: DedupeConfigProps) {
   const styles = useStyles();
+  const [selectedSheet, setSelectedSheet] = useState(currentSheet);
+  const [rowCount, setRowCount] = useState<number | undefined>(undefined);
   const [equivalenceRelation, setEquivalenceRelation] = useState("");
+
+  useEffect(() => {
+    setSelectedSheet(currentSheet);
+  }, [currentSheet]);
+
+  useEffect(() => {
+    const loadSheetInfo = async () => {
+      try {
+        const info = await getSheetInfo(selectedSheet);
+        setRowCount(info.rowCount);
+      } catch {
+        setRowCount(undefined);
+      }
+    };
+    loadSheetInfo();
+  }, [selectedSheet]);
 
   const handleRun = async () => {
     if (!equivalenceRelation.trim()) {
@@ -49,7 +72,7 @@ export function DedupeConfig({
     try {
       const result = await runDedupeOperation({
         apiKey,
-        selection,
+        sheetName: selectedSheet,
         equivalenceRelation: equivalenceRelation.trim(),
       });
       onComplete(
@@ -67,6 +90,15 @@ export function DedupeConfig({
 
   return (
     <div className={styles.container}>
+      <SheetSelector
+        label="Input Sheet"
+        sheets={sheets}
+        selectedSheet={selectedSheet}
+        onSheetChange={setSelectedSheet}
+        onRefresh={onRefreshSheets}
+        rowCount={rowCount}
+      />
+
       <div className={styles.field}>
         <Label htmlFor="equivalence">Equivalence Relation</Label>
         <Textarea

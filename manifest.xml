@@ -6,8 +6,7 @@
   xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
   xsi:type="TaskPaneApp">
 
-  <!-- Begin Basic Settings -->
-  <Id>a1b2c3d4-e5f6-7890-abcd-everyrowexcel</Id>
+  <Id>b2c3d4e5-f6a7-8901-bcde-f12345678901</Id>
   <Version>1.0.0.0</Version>
   <ProviderName>FutureSearch</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
@@ -16,9 +15,7 @@
   <IconUrl DefaultValue="https://localhost:3000/assets/icon-32.png"/>
   <HighResolutionIconUrl DefaultValue="https://localhost:3000/assets/icon-64.png"/>
   <SupportUrl DefaultValue="https://everyrow.io"/>
-  <!-- End Basic Settings -->
 
-  <!-- Begin TaskPaneApp-only settings -->
   <AppDomains>
     <AppDomain>https://engine.futuresearch.ai</AppDomain>
     <AppDomain>https://everyrow.io</AppDomain>
@@ -33,7 +30,6 @@
   </DefaultSettings>
 
   <Permissions>ReadWriteDocument</Permissions>
-  <!-- End TaskPaneApp-only settings -->
 
   <VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="VersionOverridesV1_0">
     <Hosts>

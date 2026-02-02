@@ -11,20 +11,21 @@ import {
   Link,
 } from "@fluentui/react-components";
 import { ApiKeySetup } from "./components/ApiKeySetup";
-import { DataSelection } from "./components/DataSelection";
 import { OperationPicker, Operation } from "./components/OperationPicker";
 import { OperationConfig } from "./components/OperationConfig";
 import { getApiKey } from "../config/settings";
-import { getSelectionInfo, SelectionInfo } from "../excel/dataHandler";
+import { getAvailableSheets, SheetInfo } from "../excel/dataHandler";
 
 const useStyles = makeStyles({
   container: {
     display: "flex",
     flexDirection: "column",
     height: "100%",
+    minHeight: 0,
     padding: tokens.spacingHorizontalM,
   },
   header: {
+    flexShrink: 0,
     marginBottom: tokens.spacingVerticalM,
     paddingBottom: tokens.spacingVerticalS,
     borderBottom: `1px solid ${tokens.colorNeutralStroke1}`,
@@ -34,16 +35,18 @@ const useStyles = makeStyles({
   },
   content: {
     flex: 1,
+    minHeight: 0,
     display: "flex",
     flexDirection: "column",
     gap: tokens.spacingVerticalM,
     overflowY: "auto",
+    paddingBottom: tokens.spacingVerticalM,
   },
   step: {
+    flexShrink: 0,
     backgroundColor: tokens.colorNeutralBackground1,
     borderRadius: tokens.borderRadiusMedium,
     padding: tokens.spacingHorizontalM,
-    boxShadow: tokens.shadow4,
   },
   stepTitle: {
     marginBottom: tokens.spacingVerticalS,
@@ -58,6 +61,7 @@ const useStyles = makeStyles({
     gap: tokens.spacingVerticalM,
   },
   footer: {
+    flexShrink: 0,
     marginTop: tokens.spacingVerticalM,
     paddingTop: tokens.spacingVerticalS,
     borderTop: `1px solid ${tokens.colorNeutralStroke1}`,
@@ -72,13 +76,25 @@ export default function App() {
   const styles = useStyles();
   const [appState, setAppState] = useState<AppState>("loading");
   const [apiKey, setApiKey] = useState<string | null>(null);
-  const [selection, setSelection] = useState<SelectionInfo | null>(null);
+  const [sheets, setSheets] = useState<SheetInfo[]>([]);
+  const [currentSheet, setCurrentSheet] = useState<string>("");
   const [selectedOperation, setSelectedOperation] = useState<Operation | null>(
     null
   );
   const [statusMessage, setStatusMessage] = useState<string>("");
   const [sessionUrl, setSessionUrl] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string>("");
+
+  // Load available sheets
+  const loadSheets = useCallback(async () => {
+    try {
+      const result = await getAvailableSheets();
+      setSheets(result.sheets);
+      setCurrentSheet(result.currentSheet);
+    } catch (error) {
+      console.error("Error getting sheets:", error);
+    }
+  }, []);
 
   // Check for API key on mount
   useEffect(() => {
@@ -91,23 +107,11 @@ export default function App() {
     }
   }, []);
 
-  // Poll for selection changes
+  // Load sheets when ready
   useEffect(() => {
     if (appState !== "ready") return;
-
-    const updateSelection = async () => {
-      try {
-        const info = await getSelectionInfo();
-        setSelection(info);
-      } catch (error) {
-        console.error("Error getting selection:", error);
-      }
-    };
-
-    updateSelection();
-    const interval = setInterval(updateSelection, 1500);
-    return () => clearInterval(interval);
-  }, [appState]);
+    loadSheets();
+  }, [appState, loadSheets]);
 
   const handleApiKeySaved = useCallback((key: string) => {
     setApiKey(key);
@@ -203,25 +207,22 @@ export default function App() {
         {appState === "ready" && (
           <>
             <div className={styles.step}>
-              <div className={styles.stepTitle}>1. Select Data</div>
-              <DataSelection selection={selection} />
-            </div>
-
-            <div className={styles.step}>
-              <div className={styles.stepTitle}>2. Choose Operation</div>
+              <div className={styles.stepTitle}>1. Choose Operation</div>
               <OperationPicker
                 selected={selectedOperation}
                 onSelect={setSelectedOperation}
               />
             </div>
 
-            {selectedOperation && selection && selection.rowCount > 0 && (
+            {selectedOperation && sheets.length > 0 && (
               <div className={styles.step}>
-                <div className={styles.stepTitle}>3. Configure & Run</div>
+                <div className={styles.stepTitle}>2. Configure & Run</div>
                 <OperationConfig
                   operation={selectedOperation}
-                  selection={selection}
+                  sheets={sheets}
+                  currentSheet={currentSheet}
                   apiKey={apiKey}
+                  onRefreshSheets={loadSheets}
                   onRunning={() => setAppState("running")}
                   onComplete={handleOperationComplete}
                 />

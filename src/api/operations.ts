@@ -5,12 +5,12 @@ import {
   getArtifacts,
   getSessionUrl,
 } from "./client";
-import { SelectionInfo, selectionToRecords, rangeToRecords, writeResultsToSheet, Record } from "../excel/dataHandler";
+import { sheetToRecords, writeResultsToSheet, Record } from "../excel/dataHandler";
 import { TaskPayload, OperationResult } from "./types";
 
 interface BaseOperationParams {
   apiKey: string;
-  selection: SelectionInfo;
+  sheetName: string;
 }
 
 /**
@@ -84,16 +84,16 @@ interface RankParams extends BaseOperationParams {
 }
 
 export async function runRankOperation(params: RankParams): Promise<OperationResult> {
-  const { apiKey, task, fieldName, ascending } = params;
+  const { apiKey, sheetName, task, fieldName, ascending } = params;
 
   // Create session
   const session = await createSession(apiKey, `Excel Rank: ${task.slice(0, 50)}`);
   const sessionUrl = getSessionUrl(session.session_id);
 
-  // Get selection data
-  const records = await selectionToRecords();
+  // Get sheet data
+  const records = await sheetToRecords(sheetName);
   if (records.length === 0) {
-    throw new Error("No data selected");
+    throw new Error(`No data found in sheet "${sheetName}"`);
   }
 
   // Create input artifact
@@ -128,12 +128,12 @@ export async function runRankOperation(params: RankParams): Promise<OperationRes
 
   // Get results and write to sheet
   const results = await extractResults(apiKey, status.artifact_id);
-  const sheetName = await writeResultsToSheet(results, "Ranked");
+  const resultSheetName = await writeResultsToSheet(results, "Ranked");
 
   return {
     rowCount: results.length,
     sessionUrl,
-    sheetName,
+    sheetName: resultSheetName,
   };
 }
 
@@ -144,14 +144,14 @@ interface ScreenParams extends BaseOperationParams {
 }
 
 export async function runScreenOperation(params: ScreenParams): Promise<OperationResult> {
-  const { apiKey, task } = params;
+  const { apiKey, sheetName, task } = params;
 
   const session = await createSession(apiKey, `Excel Screen: ${task.slice(0, 50)}`);
   const sessionUrl = getSessionUrl(session.session_id);
 
-  const records = await selectionToRecords();
+  const records = await sheetToRecords(sheetName);
   if (records.length === 0) {
-    throw new Error("No data selected");
+    throw new Error(`No data found in sheet "${sheetName}"`);
   }
 
   const inputArtifactId = await createInputArtifact(apiKey, session.session_id, records);
@@ -187,7 +187,7 @@ export async function runScreenOperation(params: ScreenParams): Promise<Operatio
   const results = await extractResults(apiKey, status.artifact_id);
   // Filter to only passing rows
   const passingResults = results.filter((r) => r.passes === true);
-  const sheetName = await writeResultsToSheet(
+  const resultSheetName = await writeResultsToSheet(
     passingResults.length > 0 ? passingResults : results,
     "Screened"
   );
@@ -195,7 +195,7 @@ export async function runScreenOperation(params: ScreenParams): Promise<Operatio
   return {
     rowCount: passingResults.length || results.length,
     sessionUrl,
-    sheetName,
+    sheetName: resultSheetName,
   };
 }
 
@@ -206,7 +206,7 @@ interface DedupeParams extends BaseOperationParams {
 }
 
 export async function runDedupeOperation(params: DedupeParams): Promise<OperationResult> {
-  const { apiKey, equivalenceRelation } = params;
+  const { apiKey, sheetName, equivalenceRelation } = params;
 
   const session = await createSession(
     apiKey,
@@ -214,9 +214,9 @@ export async function runDedupeOperation(params: DedupeParams): Promise<Operatio
   );
   const sessionUrl = getSessionUrl(session.session_id);
 
-  const records = await selectionToRecords();
+  const records = await sheetToRecords(sheetName);
   if (records.length === 0) {
-    throw new Error("No data selected");
+    throw new Error(`No data found in sheet "${sheetName}"`);
   }
 
   const inputArtifactId = await createInputArtifact(apiKey, session.session_id, records);
@@ -242,7 +242,7 @@ export async function runDedupeOperation(params: DedupeParams): Promise<Operatio
   const results = await extractResults(apiKey, status.artifact_id);
   // Filter to selected/canonical records
   const uniqueResults = results.filter((r) => r.selected === true);
-  const sheetName = await writeResultsToSheet(
+  const resultSheetName = await writeResultsToSheet(
     uniqueResults.length > 0 ? uniqueResults : results,
     "Deduped"
   );
@@ -250,7 +250,7 @@ export async function runDedupeOperation(params: DedupeParams): Promise<Operatio
   return {
     rowCount: uniqueResults.length || results.length,
     sessionUrl,
-    sheetName,
+    sheetName: resultSheetName,
   };
 }
 
@@ -261,14 +261,14 @@ interface AgentParams extends BaseOperationParams {
 }
 
 export async function runAgentOperation(params: AgentParams): Promise<OperationResult> {
-  const { apiKey, task } = params;
+  const { apiKey, sheetName, task } = params;
 
   const session = await createSession(apiKey, `Excel Agent: ${task.slice(0, 50)}`);
   const sessionUrl = getSessionUrl(session.session_id);
 
-  const records = await selectionToRecords();
+  const records = await sheetToRecords(sheetName);
   if (records.length === 0) {
-    throw new Error("No data selected");
+    throw new Error(`No data found in sheet "${sheetName}"`);
   }
 
   const inputArtifactId = await createInputArtifact(apiKey, session.session_id, records);
@@ -293,39 +293,41 @@ export async function runAgentOperation(params: AgentParams): Promise<OperationR
   }
 
   const results = await extractResults(apiKey, status.artifact_id);
-  const sheetName = await writeResultsToSheet(results, "Researched");
+  const resultSheetName = await writeResultsToSheet(results, "Researched");
 
   return {
     rowCount: results.length,
     sessionUrl,
-    sheetName,
+    sheetName: resultSheetName,
   };
 }
 
 // ============ MERGE ============
 
-interface MergeParams extends BaseOperationParams {
+interface MergeParams {
+  apiKey: string;
+  leftSheetName: string;
+  rightSheetName: string;
   task: string;
-  table2Range: string;
   mergeOnLeft?: string;
   mergeOnRight?: string;
 }
 
 export async function runMergeOperation(params: MergeParams): Promise<OperationResult> {
-  const { apiKey, task, table2Range, mergeOnLeft, mergeOnRight } = params;
+  const { apiKey, leftSheetName, rightSheetName, task, mergeOnLeft, mergeOnRight } = params;
 
   const session = await createSession(apiKey, `Excel Merge: ${task.slice(0, 50)}`);
   const sessionUrl = getSessionUrl(session.session_id);
 
   // Get both tables
-  const leftRecords = await selectionToRecords();
+  const leftRecords = await sheetToRecords(leftSheetName);
   if (leftRecords.length === 0) {
-    throw new Error("No data selected for Table 1");
+    throw new Error(`No data found in left table sheet "${leftSheetName}"`);
   }
 
-  const rightRecords = await rangeToRecords(table2Range);
+  const rightRecords = await sheetToRecords(rightSheetName);
   if (rightRecords.length === 0) {
-    throw new Error("No data found in Table 2 range");
+    throw new Error(`No data found in right table sheet "${rightSheetName}"`);
   }
 
   // Create input artifacts for both tables
@@ -353,11 +355,11 @@ export async function runMergeOperation(params: MergeParams): Promise<OperationR
   }
 
   const results = await extractResults(apiKey, status.artifact_id);
-  const sheetName = await writeResultsToSheet(results, "Merged");
+  const resultSheetName = await writeResultsToSheet(results, "Merged");
 
   return {
     rowCount: results.length,
     sessionUrl,
-    sheetName,
+    sheetName: resultSheetName,
   };
 }
