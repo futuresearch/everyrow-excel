@@ -89,7 +89,7 @@ everyrow-excel/
 │   ├── taskpane/           # React UI components
 │   │   ├── App.tsx         # Main app component
 │   │   └── components/     # UI components
-│   ├── api/                # Cohort Engine API client
+│   ├── api/                # EveryRow API client
 │   ├── excel/              # Excel data handling
 │   └── config/             # Settings storage
 ├── assets/                 # Icons
@@ -100,7 +100,7 @@ everyrow-excel/
 
 ## API
 
-This add-in communicates with the Cohort Engine API at `https://engine.futuresearch.ai`.
+This add-in communicates with the EveryRow API at `https://engine.futuresearch.ai`.
 
 See [everyrow-sdk](https://github.com/futuresearch/everyrow-sdk) for the Python SDK.
 
