@@ -41,9 +41,18 @@ export async function getAvailableSheets(): Promise<AvailableSheetsResult> {
 export async function getSheetInfo(sheetName: string): Promise<SelectionInfo> {
   return Excel.run(async (context) => {
     const sheet = context.workbook.worksheets.getItem(sheetName);
-    const usedRange = sheet.getUsedRange();
-    usedRange.load(["address", "rowCount", "values"]);
+    // Use getUsedRangeOrNullObject to avoid errors on empty sheets
+    const usedRange = sheet.getUsedRangeOrNullObject();
+    usedRange.load(["address", "rowCount", "values", "isNullObject"]);
     await context.sync();
+
+    if (usedRange.isNullObject) {
+      return {
+        range: "",
+        rowCount: 0,
+        headers: [],
+      };
+    }
 
     const values = usedRange.values;
     if (!values || values.length < 2) {
@@ -81,9 +90,14 @@ export async function getSheetInfo(sheetName: string): Promise<SelectionInfo> {
 export async function sheetToRecords(sheetName: string): Promise<Record[]> {
   return Excel.run(async (context) => {
     const sheet = context.workbook.worksheets.getItem(sheetName);
-    const usedRange = sheet.getUsedRange();
-    usedRange.load("values");
+    // Use getUsedRangeOrNullObject to avoid errors on empty sheets
+    const usedRange = sheet.getUsedRangeOrNullObject();
+    usedRange.load("values,isNullObject");
     await context.sync();
+
+    if (usedRange.isNullObject) {
+      return [];
+    }
 
     const values = usedRange.values;
     if (!values || values.length < 2) {

@@ -106,7 +106,7 @@ export function DedupeConfig({
           placeholder="e.g., Same company, possibly with different name variations or abbreviations"
           value={equivalenceRelation}
           onChange={(_, data) => setEquivalenceRelation(data.value)}
-          rows={3}
+          rows={5}
         />
       </div>
 

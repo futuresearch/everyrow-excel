@@ -102,7 +102,7 @@ export function ScreenConfig({
           placeholder="e.g., B2B SaaS companies with more than 50 employees"
           value={task}
           onChange={(_, data) => setTask(data.value)}
-          rows={3}
+          rows={5}
         />
       </div>
 

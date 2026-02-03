@@ -162,7 +162,7 @@ export function MergeConfig({
           placeholder="e.g., Match each software product to its parent company"
           value={task}
           onChange={(_, data) => setTask(data.value)}
-          rows={2}
+          rows={4}
         />
       </div>
 

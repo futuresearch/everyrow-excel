@@ -23,16 +23,14 @@ async function createInputArtifact(
 ): Promise<string> {
   const payload: TaskPayload = {
     task_type: "create_group",
-    processing_mode: "map",
-    query: {},
+    processing_mode: "transform",
+    query: {
+      data_to_create: records,
+    },
     input_artifacts: [],
   };
 
-  // Create group task expects records in a special format
-  const response = await submitTask(apiKey, sessionId, {
-    ...payload,
-    input_data: records,
-  });
+  const response = await submitTask(apiKey, sessionId, payload);
 
   const status = await pollTaskCompletion(apiKey, response.task_id);
   if (!status.artifact_id) {
@@ -60,19 +58,43 @@ async function extractResults(
   if (artifact.type === "group" && artifact.artifacts) {
     const records: Record[] = [];
     for (const child of artifact.artifacts) {
+      const childAny = child as unknown as Record;
+      // Try different possible data locations
       if (child.data && Array.isArray(child.data)) {
         records.push(...(child.data as Record[]));
+      } else if (childAny.row && typeof childAny.row === "object") {
+        // Single row object
+        records.push(childAny.row as Record);
+      } else if (childAny.rows && Array.isArray(childAny.rows)) {
+        records.push(...(childAny.rows as Record[]));
+      } else if (child.data && typeof child.data === "object" && !Array.isArray(child.data)) {
+        // Single data object (not array)
+        records.push(child.data as Record);
       }
+    }
+    if (records.length === 0) {
+      const firstChild = artifact.artifacts[0];
+      const childKeys = firstChild ? Object.keys(firstChild).join(", ") : "none";
+      throw new Error(
+        `No data records found in group artifact with ${artifact.artifacts.length} children. ` +
+        `First child keys: [${childKeys}]`
+      );
     }
     return records;
   }
 
-  // Handle standalone artifacts
+  // Handle standalone artifacts with data array
   if (artifact.data && Array.isArray(artifact.data)) {
     return artifact.data as Record[];
   }
 
-  throw new Error("Unexpected artifact format");
+  // Handle artifacts where rows might be in a different location
+  const anyArtifact = artifact as unknown as Record;
+  if (anyArtifact.rows && Array.isArray(anyArtifact.rows)) {
+    return anyArtifact.rows as Record[];
+  }
+
+  throw new Error(`Unexpected artifact format: type=${artifact.type}, keys=${Object.keys(artifact).join(",")}`);
 }
 
 // ============ RANK ============
@@ -256,12 +278,18 @@ export async function runDedupeOperation(params: DedupeParams): Promise<Operatio
 
 // ============ AGENT ============
 
+// API expects flat schema: { fieldName: { type: "str" | "float" | "bool" } }
+interface ResponseSchema {
+  [key: string]: { type: "str" | "float" | "bool"; description?: string };
+}
+
 interface AgentParams extends BaseOperationParams {
   task: string;
+  responseSchema?: ResponseSchema;
 }
 
 export async function runAgentOperation(params: AgentParams): Promise<OperationResult> {
-  const { apiKey, sheetName, task } = params;
+  const { apiKey, sheetName, task, responseSchema } = params;
 
   const session = await createSession(apiKey, `Excel Agent: ${task.slice(0, 50)}`);
   const sessionUrl = getSessionUrl(session.session_id);
@@ -273,13 +301,20 @@ export async function runAgentOperation(params: AgentParams): Promise<OperationR
 
   const inputArtifactId = await createInputArtifact(apiKey, session.session_id, records);
 
+  const query: Record = {
+    task,
+    effort_level: "low",
+  };
+
+  // Add response_schema if custom output columns are defined
+  if (responseSchema) {
+    query.response_schema = responseSchema;
+  }
+
   const payload: TaskPayload = {
     task_type: "agent",
     processing_mode: "map",
-    query: {
-      task,
-      effort_level: "low",
-    },
+    query,
     input_artifacts: [inputArtifactId],
     context_artifacts: [],
     join_with_input: true,

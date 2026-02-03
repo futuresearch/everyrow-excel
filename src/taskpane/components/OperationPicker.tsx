@@ -54,14 +54,14 @@ const operations: OperationDef[] = [
     description: "Remove semantic duplicates",
   },
   {
-    id: "agent",
-    name: "Agent",
-    description: "Run AI web research on each row",
-  },
-  {
     id: "merge",
     name: "Merge",
     description: "Join tables using AI-powered matching",
+  },
+  {
+    id: "agent",
+    name: "Agent",
+    description: "Run AI web research on each row",
   },
 ];
 

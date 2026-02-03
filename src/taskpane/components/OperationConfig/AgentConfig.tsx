@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   makeStyles,
   tokens,
@@ -9,6 +9,7 @@ import {
 import { SheetInfo, getSheetInfo } from "../../../excel/dataHandler";
 import { runAgentOperation } from "../../../api/operations";
 import { SheetSelector } from "../SheetSelector";
+import { OutputColumnsSection, OutputSchema } from "../OutputColumnsSection";
 
 const useStyles = makeStyles({
   container: {
@@ -44,6 +45,11 @@ export function AgentConfig({
   const [selectedSheet, setSelectedSheet] = useState(currentSheet);
   const [rowCount, setRowCount] = useState<number | undefined>(undefined);
   const [task, setTask] = useState("");
+  const [responseSchema, setResponseSchema] = useState<OutputSchema | null>(null);
+
+  const handleSchemaChange = useCallback((schema: OutputSchema | null) => {
+    setResponseSchema(schema);
+  }, []);
 
   useEffect(() => {
     setSelectedSheet(currentSheet);
@@ -74,6 +80,7 @@ export function AgentConfig({
         apiKey,
         sheetName: selectedSheet,
         task: task.trim(),
+        responseSchema: responseSchema || undefined,
       });
       onComplete(
         true,
@@ -106,9 +113,11 @@ export function AgentConfig({
           placeholder="e.g., Find LinkedIn page, headquarters location, and founding year"
           value={task}
           onChange={(_, data) => setTask(data.value)}
-          rows={3}
+          rows={5}
         />
       </div>
+
+      <OutputColumnsSection onChange={handleSchemaChange} />
 
       <Button appearance="primary" onClick={handleRun}>
         Run Agent

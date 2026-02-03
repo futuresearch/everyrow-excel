@@ -113,7 +113,7 @@ export function RankConfig({
           placeholder="e.g., Rank companies by growth potential and market opportunity"
           value={task}
           onChange={(_, data) => setTask(data.value)}
-          rows={3}
+          rows={5}
         />
       </div>
 

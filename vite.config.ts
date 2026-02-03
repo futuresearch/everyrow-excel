@@ -41,5 +41,13 @@ export default defineConfig({
     headers: {
       "Access-Control-Allow-Origin": "*",
     },
+    proxy: {
+      "/api": {
+        target: "https://engine.futuresearch.ai",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ""),
+        secure: true,
+      },
+    },
   },
 });

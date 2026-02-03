@@ -1,4 +1,7 @@
-const API_BASE_URL = "https://engine.futuresearch.ai";
+// Use proxy in development to avoid CORS issues
+const API_BASE_URL = import.meta.env.DEV
+  ? "/api"
+  : "https://engine.futuresearch.ai";
 
 export interface ApiResponse<T> {
   data?: T;
@@ -31,14 +34,21 @@ async function makeRequest<T>(
   apiKey: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...options,
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      ...options,
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        ...options.headers,
+      },
+    });
+  } catch (error) {
+    // Network error - fetch failed
+    const message = error instanceof Error ? error.message : "Unknown error";
+    throw new Error(`Network error: ${message}. Check your internet connection.`);
+  }
 
   if (!response.ok) {
     if (response.status === 401) {
