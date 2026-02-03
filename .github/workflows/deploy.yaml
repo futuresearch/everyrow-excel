@@ -1,0 +1,105 @@
+name: Deploy Excel Add-in
+
+on:
+  workflow_dispatch:
+    inputs:
+      deploy_production:
+        description: "Deploy to production"
+        type: boolean
+        required: false
+        default: true
+  push:
+    branches: ["main"]
+    paths:
+      - "src/**"
+      - "assets/**"
+      - "manifest.production.xml"
+      - "package.json"
+      - "vite.config.ts"
+      - ".github/workflows/deploy.yaml"
+
+env:
+  GCP_PROJECT_NAME: varuna-400921
+  EXCEL_ADDIN_BUCKET: "excel.everyrow.io"
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Type check
+        run: pnpm lint
+
+      - name: Run tests
+        run: pnpm test
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: ${{ github.ref == 'refs/heads/main' || inputs.deploy_production }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build for production
+        run: pnpm build:prod
+
+      - name: Log in to Google Cloud
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: ${{ secrets.GCP_CREDENTIALS_GLOBAL }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy to GCS
+        run: |
+          gsutil -m -h "Cache-Control:max-age=300" rsync -r -d ./dist/ gs://${{ env.EXCEL_ADDIN_BUCKET }}
+          # Set correct MIME types
+          gsutil -m setmeta -h "Content-Type:text/html" gs://${{ env.EXCEL_ADDIN_BUCKET }}/*.html
+          gsutil -m setmeta -h "Content-Type:application/javascript" gs://${{ env.EXCEL_ADDIN_BUCKET }}/assets/*.js
+          gsutil -m setmeta -h "Content-Type:text/css" gs://${{ env.EXCEL_ADDIN_BUCKET }}/assets/*.css
+          gsutil -m setmeta -h "Content-Type:text/xml" gs://${{ env.EXCEL_ADDIN_BUCKET }}/manifest.xml
+
+      - name: Print deployment URL
+        run: |
+          echo "Deployed to https://excel.everyrow.io/"
+          echo "Manifest URL: https://excel.everyrow.io/manifest.xml"
