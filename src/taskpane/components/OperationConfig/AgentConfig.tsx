@@ -5,6 +5,8 @@ import {
   Textarea,
   Button,
   Label,
+  Dropdown,
+  Option,
 } from "@fluentui/react-components";
 import { SheetInfo, getSheetInfo } from "../../../excel/dataHandler";
 import { runAgentOperation } from "../../../api/operations";
@@ -46,6 +48,7 @@ export function AgentConfig({
   const [rowCount, setRowCount] = useState<number | undefined>(undefined);
   const [task, setTask] = useState("");
   const [responseSchema, setResponseSchema] = useState<OutputSchema | null>(null);
+  const [effortLevel, setEffortLevel] = useState<"low" | "medium" | "high">("medium");
 
   const handleSchemaChange = useCallback((schema: OutputSchema | null) => {
     setResponseSchema(schema);
@@ -81,6 +84,7 @@ export function AgentConfig({
         sheetName: selectedSheet,
         task: task.trim(),
         responseSchema: responseSchema || undefined,
+        effortLevel,
       });
       onComplete(
         true,
@@ -115,6 +119,28 @@ export function AgentConfig({
           onChange={(_, data) => setTask(data.value)}
           rows={5}
         />
+      </div>
+
+      <div className={styles.field}>
+        <Label htmlFor="effort">Effort Level</Label>
+        <Dropdown
+          id="effort"
+          value={
+            effortLevel === "low"
+              ? "Low — Fast, no web research"
+              : effortLevel === "medium"
+                ? "Medium — Includes web research"
+                : "High — More thorough research"
+          }
+          selectedOptions={[effortLevel]}
+          onOptionSelect={(_, data) =>
+            setEffortLevel(data.optionValue as "low" | "medium" | "high")
+          }
+        >
+          <Option value="low">Low — Fast, no web research</Option>
+          <Option value="medium">Medium — Includes web research</Option>
+          <Option value="high">High — More thorough research</Option>
+        </Dropdown>
       </div>
 
       <OutputColumnsSection onChange={handleSchemaChange} />

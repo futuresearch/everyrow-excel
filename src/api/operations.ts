@@ -283,13 +283,16 @@ interface ResponseSchema {
   [key: string]: { type: "str" | "float" | "bool"; description?: string };
 }
 
+type EffortLevel = "low" | "medium" | "high";
+
 interface AgentParams extends BaseOperationParams {
   task: string;
   responseSchema?: ResponseSchema;
+  effortLevel?: EffortLevel;
 }
 
 export async function runAgentOperation(params: AgentParams): Promise<OperationResult> {
-  const { apiKey, sheetName, task, responseSchema } = params;
+  const { apiKey, sheetName, task, responseSchema, effortLevel = "medium" } = params;
 
   const session = await createSession(apiKey, `Excel Agent: ${task.slice(0, 50)}`);
   const sessionUrl = getSessionUrl(session.session_id);
@@ -303,7 +306,7 @@ export async function runAgentOperation(params: AgentParams): Promise<OperationR
 
   const query: Record = {
     task,
-    effort_level: "low",
+    effort_level: effortLevel,
   };
 
   // Add response_schema if custom output columns are defined
